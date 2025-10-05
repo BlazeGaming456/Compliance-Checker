@@ -102,7 +102,7 @@ async function getData() {
       brand,
       price,
       netWeight,
-      highResImages
+      highResImages,
     });
 
     fs.writeFileSync("output.html", html);
@@ -117,19 +117,23 @@ async function getData() {
 
 async function getDataFromImage() {
   const imageUrl = "";
-  const response = await fetch(
-    "https://i.sstatic.net/IvV2y.png"
-  );
+  const response = await fetch("https://i.sstatic.net/IvV2y.png");
   const buffer = await response.arrayBuffer();
   fs.writeFileSync("temp_original.png", Buffer.from(buffer));
 
-  const processedBuffer = await sharp(Buffer.from(buffer)).resize({height:300}).grayscale().modulate({brightness:1.2}).toBuffer();
+  const processedBuffer = await sharp(Buffer.from(buffer))
+    .resize({ height: 300 })
+    .grayscale()
+    .modulate({ brightness: 1.2 })
+    .toBuffer();
 
-    fs.writeFileSync("temp_processed.png", processedBuffer);
+  fs.writeFileSync("temp_processed.png", processedBuffer);
 
-  Tesseract.recognize("temp_processed.png", "eng").then(({ data: text }) => {
-    console.log("Extracted Text: ", text.text);
-  }).catch((err) => console.error("OCR Error: ", err));
+  Tesseract.recognize("temp_processed.png", "eng")
+    .then(({ data: text }) => {
+      console.log("Extracted Text: ", text.text);
+    })
+    .catch((err) => console.error("OCR Error: ", err));
 }
 
 //getData();
