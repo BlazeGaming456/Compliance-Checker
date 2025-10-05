@@ -1,8 +1,11 @@
 import puppeteer from "puppeteer";
+import Tesseract from "tesseract.js";
+import fetch from "node-fetch";
+import sharp from "sharp";
 import * as cheerio from "cheerio";
 import fs from "fs";
 
-async function getDate() {
+async function getData() {
   let browser;
 
   try {
@@ -18,19 +21,19 @@ async function getDate() {
 
     // Navigate to the page
     await page.goto(
-      "https://www.amazon.in/dp/B0FTMD7RPG/ref=sr_1_3_sspa?dib=eyJ2IjoiMSJ9.UEZaFcOQ-net8SDvKusyzqBUCs-MMDCIADg-C7xoRiRwp0zrfSAW1GS-qGQ9n5N7FXOA1UZh8WYowtqUan0B5F00RoNBAyT0bouTvlWvGla0HIcWDZSBRvOyzQ1FYvMnaeTmwqCMUXlQFYhKL-iz1Jhxn6obqGcwMFMo2IIDVrU2tfAaKbMlxYivoJKV9Rbmz3gz5vKO0ds9gg-N3duZVUSXZPP74zhA3QUfOaziS83kwoGAzZ6KaKydne9ZIeFIJ1sQ9SJ_vr6jfomIdOTG-5xkCX-BYNK_0HdKUxuLS-Y.X8PfF-pcm6tMJftPf4PIUAn-_ov3sYypbGUAFSa8S0s&dib_tag=se&keywords=oreo&qid=1759659441&sr=8-3-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY&psc=1",
+      "https://www.amazon.in/Oreo-Cadbury-Family-Biscuit-Vanilla/dp/B09ZV4W4DF/ref=sr_1_5?crid=19SKCDCA87H23&dib=eyJ2IjoiMSJ9.UEZaFcOQ-net8SDvKusyzqBUCs-MMDCIADg-C7xoRiQELFZQE5OYlI1vUuNz_muHjXL2gbq3F0ksRKGTrHwaoL5bYoMLanCTNnI8LrOX3y3ZN91oginn8dkXSIwT2BEqPVdC4s7VXJynKlV6zXXMhwLjIjW2c88fpn5Ma0pyaaNrXos-fzcQRDiEjFYxbRgKoU_dt7I9jMKdjTW7YcXpML3K0kGfZBYEKtl4NZQ1YVo6LpnmQKTVTVEaFV8zH38-Y9wRVe58DnYdityPJ4rYS5xkCX-BYNK_0HdKUxuLS-Y.e3MEZNile4PRyy493ZE9rjgTAzzN4SpsmtoZjMaMg60&dib_tag=se&keywords=oreo+biscuit&qid=1759663302&sprefix=oreo+biscuit%2Caps%2C712&sr=8-5",
       {
         waitUntil: "networkidle2",
       }
     );
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    
+
     const html = await page.content();
     const $ = cheerio.load(html);
 
     // 1. Product Title
     const title = $("#productTitle").text().trim();
-    
+
     // 2. Product Price
     const price = $(".a-price .a-offscreen").first().text().trim();
 
@@ -43,15 +46,37 @@ async function getDate() {
     }
     brand = brand.replace(/^Brand:\s*/i, "");
 
-    // 4. Prouct Images
-    const images = [];
+    // // 4. Product Images
+    // const images = [];
+    // $("#altImages img").each((i, el) => {
+    //   const img = $(el).attr("src");
+    //   if (img) images.push(img);
+    // });
+
+    // // 5. Main image
+    // const mainImage = $("#imgTagWrapperId img").attr("src");
+
+    const highResImages = [];
+
+    // Loop through all thumbnails
     $("#altImages img").each((i, el) => {
-      const img = $(el).attr("src");
-      if (img) images.push(img);
+      let imgUrl = $(el).attr("data-old-hires") || $(el).attr("src");
+
+      // If src has low-res suffix, replace with _SL1500_ for high-res
+      if (imgUrl) {
+        imgUrl = imgUrl.replace(/_.*?\./, "_SL1500.");
+        highResImages.push(imgUrl);
+      }
     });
 
-    // 5. Main image
-    const mainImage = $("#imgTagWrapperId img").attr("src");
+    // Also include the main product image
+    const mainImg =
+      $("#landingImage").attr("data-old-hires") ||
+      $("#landingImage").attr("src");
+    if (mainImg) {
+      const highResMain = mainImg.replace(/_.*?\./, "_SL1500.");
+      highResImages.unshift(highResMain); // Put main image first
+    }
 
     // 6. Net Weight
     let netWeight = "";
@@ -77,8 +102,7 @@ async function getDate() {
       brand,
       price,
       netWeight,
-      mainImage,
-      images
+      highResImages
     });
 
     fs.writeFileSync("output.html", html);
@@ -91,4 +115,22 @@ async function getDate() {
   }
 }
 
-getDate();
+async function getDataFromImage() {
+  const imageUrl = "";
+  const response = await fetch(
+    "https://i.sstatic.net/IvV2y.png"
+  );
+  const buffer = await response.arrayBuffer();
+  fs.writeFileSync("temp_original.png", Buffer.from(buffer));
+
+  const processedBuffer = await sharp(Buffer.from(buffer)).resize({height:300}).grayscale().modulate({brightness:1.2}).toBuffer();
+
+    fs.writeFileSync("temp_processed.png", processedBuffer);
+
+  Tesseract.recognize("temp_processed.png", "eng").then(({ data: text }) => {
+    console.log("Extracted Text: ", text.text);
+  }).catch((err) => console.error("OCR Error: ", err));
+}
+
+//getData();
+getDataFromImage();
